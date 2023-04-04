@@ -1,31 +1,7 @@
-import requests
-import main
+import utils
 import functools
 
-input_str = "[1,1,3,1,1]\n\
-[1,1,5,1,1]\n\
-\n\
-[[1],[2,3,4]]\n\
-[[1],4]\n\
-\n\
-[9]\n\
-[[8,7,6]]\n\
-\n\
-[[4,4],4,4]\n\
-[[4,4],4,4,4]\n\
-\n\
-[7,7,7,7]\n\
-[7,7,7]\n\
-\n\
-[]\n\
-[3]\n\
-\n\
-[[[]]]\n\
-[[]]\n\
-\n\
-[1,[2,[3,[4,[5,6,7]]]],8,9]\n\
-[1,[2,[3,[4,[5,6,0]]]],8,9]\n"
-input_str = requests.get('https://adventofcode.com/2022/day/13/input', cookies={"session": main.SESSION_ID}).text
+input_str = utils.get_input("13")
 
 
 def extract_array(data):
@@ -89,37 +65,48 @@ def compare(left, right):
                    right if type(right) is list else [right])
 
 
-pairs = []
-for x in input_str[:-1].split("\n\n"):
-    strings = x.split("\n")
-    pair = []
-    for string in strings:
-        pair_arr, _ = parse(string)
-        pair.append(pair_arr)
-    pairs.append(pair)
+def init_p1(input_str):
+    pairs = []
+    for x in input_str.split("\n\n"):
+        strings = x.split("\n")
+        pair = []
+        for string in strings:
+            pair_arr, _ = parse(string)
+            pair.append(pair_arr)
+        pairs.append(pair)
+    return pairs
+
+def solve_p1(input_str):
+    pairs = init_p1(input_str)
+    idx_list = []
+    for idx, pair in enumerate(pairs):
+        if compare(pair[0], pair[1]) > 0:
+            idx_list.append(idx + 1)
+    return sum(idx_list)
 
 
-# Part 1
-idx_list = []
-for idx, pair in enumerate(pairs):
-    if compare(pair[0], pair[1]) > 0:
-        idx_list.append(idx+1)
+def init_p2(input_str):
+    lines = []
+    for x in input_str.split("\n\n"):
+        strings = x.split("\n")
+        for string in strings:
+            line_arr, _ = parse(string)
+            lines.append(line_arr)
+    return lines
 
-print(sum(idx_list))
+
+def solve_p2(input_str):
+    lines = init_p2(input_str)
+    divider1, divider2 = [[2]], [[6]]
+    lines.append(divider1)
+    lines.append(divider2)
+    cmp = functools.cmp_to_key(compare)
+    lines.sort(key=cmp)
+    lines.reverse()
+    return (lines.index(divider1) + 1) * (lines.index(divider2) + 1)
 
 
-# Part 2
-pairs = []
-for x in input_str[:-1].split("\n\n"):
-    strings = x.split("\n")
-    for string in strings:
-        pair_arr, length = parse(string)
-        pairs.append(pair_arr)
-divider1, divider2 = [[2]], [[6]]
-pairs.append(divider1)
-pairs.append(divider2)
-
-cmp = functools.cmp_to_key(compare)
-pairs.sort(key=cmp)
-pairs.reverse()
-print((pairs.index(divider1)+1) * (pairs.index(divider2)+1))
+part1 = utils.time_function(solve_p1, input_str)
+print("Part 1:", part1)
+part2 = utils.time_function(solve_p2, input_str)
+print("Part 2:", part2)

@@ -1,46 +1,96 @@
-import copy
-from collections import deque
+import utils
 
-import requests
-import main
+input_str = utils.get_input("20")
 
-input_str = "1\n2\n-3\n3\n-2\n0\n4\n"
-input_str = requests.get('https://adventofcode.com/2022/day/20/input', cookies={"session": main.SESSION_ID}).text
 
-numbers = deque()
-numbers_idx = {}
-numbers_list = []
-max_number = 0
-for idx, number_str in enumerate(input_str[:-1].split("\n")):
-    number = int(number_str)
-    numbers.append(number)
-    numbers_idx[number] = idx
-    numbers_list.append(number)
-    max_number = max(max_number, number)
+class Item:
+    def __init__(self, value=None, prev=None, next=None):
+        self.value = value
+        self.prev = prev
+        self.next = next
 
-print(numbers)
-total_len = len(numbers_list)
-for i in range(total_len):
-    idx = numbers.index(numbers_list[i])
-    numbers.rotate(-idx)
-    number = numbers.popleft()
-    new_idx = number
-    numbers.insert((new_idx - (1 if number < 0 else 0)) % total_len, number + max_number * 5)
-    numbers.rotate(idx)
+    def __str__(self):
+        return f"{self.prev.value if self.prev else 'None'} -> {self.value} -> {self.next.value if self.next else 'None'}\n"
 
-    # print(numbers)
-    # printer = []
-    # for n in numbers:
-    #     if n > total_len * 3:
-    #         printer.append(n - total_len * 6)
-    #     else:
-    #         printer.append(n)
-    # print(printer)
-for idx, n in enumerate(numbers):
-    numbers[idx] = numbers[idx] - max_number * 5
-print(numbers)
-v1 = numbers[(numbers.index(0) + 1000) % total_len]
-v2 = numbers[(numbers.index(0) + 2000) % total_len]
-v3 = numbers[(numbers.index(0) + 3000) % total_len]
-print(v1, v2, v3)
-print(v1 + v2 + v3)
+
+class LinkedList:
+    def __init__(self, start: int = None):
+        self.start = Item(start)
+        self.start.next, self.start.prev = self.start, self.start
+
+    def push(self, number):
+        if self.start.value is None:
+            self.start.value = number
+            return self.start
+        item = Item(number, self.start.prev, self.start)
+        item.prev.next, item.next.prev = item, item
+        return item
+
+    def move(self, item, size):
+        offset = item.value
+        if offset == 0:
+            return
+        s = item
+        self.remove(item)
+        dir = offset / abs(offset)
+        offset = abs(offset) % (size - 1)
+        while offset > 0:
+            s = s.next if dir > 0 else s.prev
+            offset -= 1
+        self.insert(item, s if dir > 0 else s.prev)
+
+    def remove(self, item):
+        item.prev.next, item.next.prev = item.next, item.prev
+        if item == self.start:
+            self.start = item.next
+
+    def insert(self, item, after):
+        item.prev, item.next = after, after.next
+        item.prev.next, item.next.prev = item, item
+        if after == self.start.prev:
+            self.start = after
+
+
+def parse_input(input_str, decryption_key=1) -> (LinkedList, list, Item):
+    zero = None
+    item_order = []
+    linked_list = LinkedList()
+    for item_str in input_str.split('\n'):
+        item = int(item_str) * decryption_key
+        item_order.append(linked_list.push(item))
+        if item == 0:
+            zero = item_order[-1]
+    return linked_list, item_order, zero
+
+
+def solve_p1(input_str):
+    linked_list, item_order, zero = parse_input(input_str)
+    for item in item_order:
+        linked_list.move(item, len(item_order))
+    item = zero
+    res = []
+    for i in range(1, 3001):
+        item = item.next
+        if i % 1000 == 0:
+            res.append(item.value)
+    return sum(res)
+
+
+def solve_p2(input_str):
+    linked_list, item_order, zero = parse_input(input_str, 811589153)
+    for i in range(10):
+        for item in item_order:
+            linked_list.move(item, len(item_order))
+    item = zero
+    res = []
+    for i in range(1, 3001):
+        item = item.next
+        if i % 1000 == 0:
+            res.append(item.value)
+    return sum(res)
+
+
+part1 = utils.time_function(solve_p1, input_str)
+print(part1)
+part2 = utils.time_function(solve_p2, input_str)
+print(part2)

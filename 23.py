@@ -1,7 +1,13 @@
 import itertools
-import requests
-import time
-import main
+import utils
+
+input_str = utils.get_input("23")
+DIRECTIONS = [
+    [[*zip((-1, 0, 1), (-1, -1, -1))], (0, -1)],
+    [[*zip((-1, 0, 1), (1, 1, 1))], (0, 1)],
+    [[*zip((-1, -1, -1), (-1, 0, 1))], (-1, 0)],
+    [[*zip((1, 1, 1), (-1, 0, 1))], (1, 0)]
+]
 
 
 def calculate_empty_tiles(grid: set) -> int:
@@ -65,7 +71,7 @@ def step(grid: set, dir_order) -> int:
 
 def parse_input(input_str) -> set:
     grid = set()
-    for y, line in enumerate(input_str[:-1].split('\n')):
+    for y, line in enumerate(input_str.split('\n')):
         for x, char in enumerate(line):
             if char == '#':
                 grid.add((x, y))
@@ -91,15 +97,7 @@ def solve_p2(input_str) -> int:
     return cnt
 
 
-input_str = "..............\n..............\n.......#......\n.....###.#....\n...#...#.#....\n....#...##....\n...#.###......\n...##.#.##....\n....#..#......\n..............\n..............\n..............\n"
-DIRECTIONS = [
-    [[*zip((-1, 0, 1), (-1, -1, -1))], (0, -1)],
-    [[*zip((-1, 0, 1), (1, 1, 1))], (0, 1)],
-    [[*zip((-1, -1, -1), (-1, 0, 1))], (-1, 0)],
-    [[*zip((1, 1, 1), (-1, 0, 1))], (1, 0)]
-]
-input_str = requests.get('https://adventofcode.com/2022/day/23/input', cookies={"session": main.SESSION_ID}).text
-# print(*DIRECTIONS, sep='\n')
-print("Start")
-print(main.time_function(solve_p1, input_str))
-print(main.time_function(solve_p2, input_str))
+part1 = utils.time_function(solve_p1, input_str)
+print("Part 1:", part1)
+part2 = utils.time_function(solve_p2, input_str)
+print("Part 2:", part2)

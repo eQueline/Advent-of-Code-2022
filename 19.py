@@ -1,155 +1,161 @@
-import copy
+from copy import copy
 import re
 import math
+from queue import PriorityQueue
+import utils
 
-import requests
-import main
-
-input_str = "Blueprint 1: Each ore robot costs 4 ore. Each clay robot costs 2 ore. Each obsidian robot costs 3 ore " \
-            "and 14 clay. Each geode robot costs 2 ore and 7 obsidian.\nBlueprint 2: Each ore robot costs 2 ore. Each " \
-            "clay robot costs 3 ore. Each obsidian robot costs 3 ore and 8 clay. Each geode robot costs 3 ore and 12 " \
-            "obsidian.\n"
-input_str = requests.get('https://adventofcode.com/2022/day/19/input', cookies={"session": main.SESSION_ID}).text
-
-blueprints = []
-for line in input_str[:-1].split("\n"):
-    m = re.findall(r'(\d+)', line)
-    m = [int(i) for i in m]
-    blueprint = {"ore": {"ore": m[1]},
-                 "clay": {"ore": m[2]},
-                 "obsidian": {"ore": m[3], "clay": m[4]},
-                 "geode": {"ore": m[5], "obsidian": m[6]}}
-    blueprints.append(blueprint)
+input_str = utils.get_input("19")
+RESOURCES = ["ore", "clay", "obsidian", "geode"]
 
 
-def get_build_time(blueprint, robot, state):
+class Resources:
+    def __init__(self, ore=0, clay=0, obsidian=0, geode=0):
+        self.ore = ore
+        self.clay = clay
+        self.obsidian = obsidian
+        self.geode = geode
+
+    def __copy__(self):
+        return Resources(self.ore, self.clay, self.obsidian, self.geode)
+
+
+class State:
+    def __init__(self, time):
+        self.time = time
+        self.robots = Resources()
+        self.res = Resources()
+
+    def __copy__(self):
+        state_copy = State(self.time)
+        state_copy.robots = copy(self.robots)
+        state_copy.res = copy(self.res)
+        return state_copy
+
+    def __hash__(self):
+        hash_tuple = (self.time,
+                      self.robots.ore, self.robots.clay, self.robots.obsidian, self.robots.geode,
+                      self.res.ore, self.res.clay, self.res.obsidian, self.res.geode)
+        return hash(hash_tuple)
+
+    def __gt__(self, other):
+        return self.time > other.time
+
+
+class Blueprint:
+    def __init__(self):
+        self.ore = Resources()
+        self.clay = Resources()
+        self.obsidian = Resources()
+        self.geode = Resources()
+
+
+def parse_input(input_str):
+    blueprints = []
+    for line in input_str.split("\n"):
+        m = re.findall(r'(\d+)', line)
+        m = [int(i) for i in m]
+        blueprint = Blueprint()
+        blueprint.ore = Resources(ore=m[1])
+        blueprint.clay = Resources(ore=m[2])
+        blueprint.obsidian = Resources(ore=m[3], clay=m[4])
+        blueprint.geode = Resources(ore=m[5], obsidian=m[6])
+        blueprints.append(blueprint)
+    return blueprints
+
+
+def get_build_time(cost: Resources, state: State):
     time = 0
-    for req_key in blueprint[robot]:
-        if state["robots"][req_key] == 0:
+    for req_key in RESOURCES:
+        if getattr(cost, req_key) == 0:
+            continue
+        if getattr(state.robots, req_key) == 0:
             return None
-        time = max(time, math.ceil((blueprint[robot][req_key] - state["res"][req_key]) / state["robots"][req_key]))
+        time = max(time, math.ceil((getattr(cost, req_key) - getattr(state.res, req_key)) /
+                                   getattr(state.robots, req_key)))
     return time + 1
 
 
-def can_prune(blueprint, state, best_geode):
+def can_prune(blueprint: Blueprint, state, best_geode):
     # If build only geodes from now on, can it beat the best?
-    geode_robots = state["robots"]["geode"]
-    time_left = state["time"] + 1
-    total_geode = state["res"]["geode"] + time_left * (time_left - 1) / 2 + geode_robots * time_left
+    time_left = state.time + 1
+    total_geode = state.res.geode + state.robots.geode * time_left + time_left * (time_left - 1) / 2
     if total_geode <= best_geode:
         return True
-    # If robots > any single robot cost except geode
-    for res in ROBOTS:
-        if res == 'geode':
+    # If robot amount > max robot cost except geode
+    for res in RESOURCES:
+        if res == "geode":
             continue
         max_res = 0
-        for robot in ROBOTS:
-            max_res = max(max_res, blueprint[robot].get(res, 0))
-        if max_res < state["robots"][res]:
+        for robot in RESOURCES:
+            max_res = max(max_res, getattr(getattr(blueprint, robot), res))
+        if max_res < getattr(state.robots, res):
             return True
     return False
 
 
-def hash_state(state):
-    hash_ar = []
-    for robot in state["robots"]:
-        hash_ar.append(state["robots"][robot])
-    for res in state["res"]:
-        hash_ar.append(state["res"][res])
-    return hash(tuple(hash_ar))
+def get_blueprint_best_geodes(blueprint, start_time):
+    best_geodes = 0
+    visited = set()
+    states = PriorityQueue()
+    start_state = State(start_time)
+    start_state.robots.ore = 1
+    states.put(start_state)
+    while not states.empty():
+        state = states.get()
 
-
-quality_sum = 0
-ROBOTS = ["ore", "clay", "obsidian", "geode"]
-START_STATE = {"time": 24,
-               "robots": {"ore": 1, "clay": 0, "obsidian": 0, "geode": 0},
-               "res": {"ore": 0, "clay": 0, "obsidian": 0, "geode": 0}}
-for idx, bp in enumerate(blueprints):
-    best_geode = 0
-    visited = dict()
-    states = [copy.deepcopy(START_STATE)]
-    while states:
-        state = states.pop()
-        state_hash = hash_state(state)
-        pruned = can_prune(bp, state, best_geode)
-        visited[state_hash] = max(visited.get(state_hash, 0), -1 if pruned else state["time"])
-        if pruned:
-            continue
         can_build = False
-        if state["time"] == 0:
-            geode = state["res"]["geode"]
-            if geode > best_geode:
-                best_geode = geode
+        if state.time == 0:
+            if state.res.geode > best_geodes:
+                best_geodes = state.res.geode
             continue
-        for robot in reversed(ROBOTS):
-            build_time = get_build_time(bp, robot, state)
-            if build_time is None or build_time > state["time"]:
+        for robot in RESOURCES:
+            robot_costs = getattr(blueprint, robot)
+            build_time = get_build_time(robot_costs, state)
+            if build_time is None or build_time > state.time:
                 continue
-            new_state = copy.deepcopy(state)
-            # Wait for res
-            for res in new_state["robots"]:
-                new_state["res"][res] += new_state["robots"][res] * build_time
-            # Spend res
-            for req_key in bp[robot]:
-                new_state["res"][req_key] -= bp[robot][req_key]
+            new_state = copy(state)
+            # Add income and deduct cost
+            for res in RESOURCES:
+                old_value = getattr(new_state.res, res)
+                setattr(new_state.res, res,
+                        old_value + getattr(new_state.robots, res) * build_time - getattr(robot_costs, res))
             # Spend time
-            new_state["time"] -= build_time
+            new_state.time -= build_time
             # Add robot
-            new_state["robots"][robot] += 1
-            if new_state["time"] > visited.get(hash_state(new_state), -1):
-                states.append(new_state)
+            setattr(new_state.robots, robot, getattr(new_state.robots, robot) + 1)
+
+            state_hash = hash(new_state)
+            if state_hash in visited:
+                continue
+            visited.add(state_hash)
+            if not can_prune(blueprint, new_state, best_geodes):
+                states.put(new_state)
                 can_build = True
         if not can_build:
-            geode = state["res"]["geode"] + state["robots"]["geode"] * state["time"]
-            if geode > best_geode:
-                best_geode = geode
-    quality_sum += (idx + 1) * best_geode
-print(quality_sum)
+            geode = state.res.geode + state.robots.geode * state.time
+            if geode > best_geodes:
+                best_geodes = geode
+    return best_geodes
 
 
-# Part 2
-quality_mul = 1
-START_STATE = {"time": 32,
-               "robots": {"ore": 1, "clay": 0, "obsidian": 0, "geode": 0},
-               "res": {"ore": 0, "clay": 0, "obsidian": 0, "geode": 0}}
-for bp in blueprints[0:3]:
-    best_geode = 0
-    visited = dict()
-    states = [copy.deepcopy(START_STATE)]
-    while states:
-        state = states.pop()
-        state_hash = hash_state(state)
-        pruned = can_prune(bp, state, best_geode)
-        visited[state_hash] = max(visited.get(state_hash, 0), -1 if pruned else state["time"])
-        if pruned:
-            continue
-        can_build = False
-        if state["time"] == 0:
-            geode = state["res"]["geode"]
-            if geode > best_geode:
-                best_geode = geode
-            continue
-        for robot in reversed(ROBOTS):
-            build_time = get_build_time(bp, robot, state)
-            if build_time is None or build_time > state["time"]:
-                continue
-            new_state = copy.deepcopy(state)
-            # Wait for res
-            for res in new_state["robots"]:
-                new_state["res"][res] += new_state["robots"][res] * build_time
-            # Spend res
-            for req_key in bp[robot]:
-                new_state["res"][req_key] -= bp[robot][req_key]
-            # Spend time
-            new_state["time"] -= build_time
-            # Add robot
-            new_state["robots"][robot] += 1
-            if new_state["time"] > visited.get(hash_state(new_state), -1):
-                states.append(new_state)
-                can_build = True
-        if not can_build:
-            geode = state["res"]["geode"] + state["robots"]["geode"] * state["time"]
-            if geode > best_geode:
-                best_geode = geode
-    quality_mul *= best_geode
-print(quality_mul)
+def solve_p1(blueprints):
+    quality_sum = 0
+    for idx, bp in enumerate(blueprints):
+        best_geodes = get_blueprint_best_geodes(bp, 24)
+        quality_sum += (idx + 1) * best_geodes
+    return quality_sum
+
+
+def solve_p2(blueprints):
+    quality_mul = 1
+    for bp in blueprints:
+        best_geodes = get_blueprint_best_geodes(bp, 32)
+        quality_mul *= best_geodes
+    return quality_mul
+
+
+blueprints = parse_input(input_str)
+part1 = utils.time_function(solve_p1, blueprints)
+print(part1)
+part2 = utils.time_function(solve_p2, blueprints[0:3])
+print(part2)

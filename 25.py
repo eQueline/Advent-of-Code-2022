@@ -1,6 +1,7 @@
-import main
-import requests
+import utils
 
+inp_str = utils.get_input("25")
+SNAFU_MAP = ['=', '-', '0', '1', '2']
 
 def snafu_to_number(snafu):
     number = 0
@@ -19,7 +20,7 @@ def number_to_snafu(n):
 
 
 def solve_p1(input_str):
-    snafu_list = input_str[:-1].split('\n')
+    snafu_list = input_str.split('\n')
     number_sum = 0
     for snafu in snafu_list:
         number_sum += snafu_to_number(snafu)
@@ -30,20 +31,17 @@ def nts(number, string):
     return string if number <= 0 else nts((number + 2) // 5, string + SNAFU_MAP[(number + 2) % 5])
 
 
-inp_str = requests.get('https://adventofcode.com/2022/day/25/input', cookies={"session": main.SESSION_ID}).text
-SNAFU_MAP = ['=', '-', '0', '1', '2']
-print("Start")
-print(main.time_function(solve_p1, inp_str))
+print("Part 1:", utils.time_function(solve_p1, inp_str))
 
 
 # GOLF version
 def r(n,s): return s if n<=0 else r((n+2)//5,s+['=','-','0','1','2'][(n+2)%5])
-print(r(sum(sum((['=','-','0','1','2'].index(c)-2)*5**r for r,c in enumerate(s[::-1]))for s in inp_str[:-1].split('\n')),'')[::-1])
+print(r(sum(sum((['=','-','0','1','2'].index(c)-2)*5**r for r,c in enumerate(s[::-1]))for s in inp_str.split('\n')),'')[::-1])
 
 
 # One-liner with Inline recursion
 print((lambda l:lambda a,b:l(l,a,b))(lambda f,n,s:s if n<=0 else f(f,(n+2)//5,s+['=','-','0','1','2'][(n+2)%5]))
-      (sum(sum((['=','-','0','1','2'].index(c)-2)*5**r for r,c in enumerate(s[::-1]))for s in inp_str[:-1].split('\n')),'')[::-1])
+      (sum(sum((['=','-','0','1','2'].index(c)-2)*5**r for r,c in enumerate(s[::-1]))for s in inp_str.split('\n')),'')[::-1])
 
 
 # Equivalent to:

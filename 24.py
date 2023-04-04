@@ -1,7 +1,7 @@
-import main
-import requests
+import utils
 from queue import PriorityQueue
 
+input_str = utils.get_input("24")
 DIR_LIST = [
     (0, 0),
     (-1, 0),
@@ -118,10 +118,7 @@ def solve_p2(blizzards, empty_tiles, w, h, total_moves):
     return total_moves
 
 
-input_str = "#.#####\n#.....#\n#>....#\n#.....#\n#...v.#\n#.....#\n#####.#\n"
-input_str = "#.######\n#>>.<^<#\n#.<..<<#\n#>v.><>#\n#<^v^^>#\n######.#\n"
-input_str = requests.get('https://adventofcode.com/2022/day/24/input', cookies={"session": main.SESSION_ID}).text
-print("Start")
-moves, blizzards, empty_tiles, width, height = main.time_function(solve_p1, input_str)
-print(moves)
-print(main.time_function(solve_p2, blizzards, empty_tiles, width, height, moves))
+moves, blizzards, empty_tiles, width, height = utils.time_function(solve_p1, input_str)
+print("Part 1:", moves)
+part2 = utils.time_function(solve_p2, blizzards, empty_tiles, width, height, moves)
+print("Part 2:", part2)

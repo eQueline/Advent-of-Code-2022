@@ -1,22 +1,12 @@
-import copy
+import utils
 
-import requests
-import main
-
-input_str = ">>><<><>><<<>><>>><<<>>><<<><<<>><>><<>>"
-input_str = requests.get('https://adventofcode.com/2022/day/17/input', cookies={"session": main.SESSION_ID}).text
-shapes_height = [1, 3, 3, 4, 2]
-shapes = [[[0, 0], [1, 0], [2, 0], [3, 0]],
+input_str = utils.get_input("17")
+SHAPE_HEIGHTS = [1, 3, 3, 4, 2]
+SHAPES = [[[0, 0], [1, 0], [2, 0], [3, 0]],
           [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]],
           [[0, 0], [1, 0], [2, 0], [2, 1], [2, 2]],
           [[0, 0], [0, 1], [0, 2], [0, 3]],
           [[0, 0], [0, 1], [1, 0], [1, 1]]]
-shape_index = 0
-jet = input_str
-jet_index = 0
-rocks = []
-height = 0
-falling = False
 
 
 def create_rock(shape, height):
@@ -26,31 +16,10 @@ def create_rock(shape, height):
     return [rock, False]
 
 
-def print_cave():
-    global height
-    pic = []
-    for y in range(height + 8):
-        row = "|"
-        for x in range(7):
-            row += "."
-        row += "|"
-        pic.append(row)
-    for rock in rocks:
-        for coord in rock[0]:
-            row = pic[coord[1]]
-            row = row[:coord[0] + 1] + ("#" if rock[1] else "@") + row[coord[0] + 2:]
-            pic[coord[1]] = row
-    pic.reverse()
-    for row in pic:
-        print(row)
-    print("+-------+")
-
-
-def move(fall):
-    global jet_index
+def move(rocks, falling, jet, jet_index):
     rock = rocks.pop()
     new_rock = []
-    if fall:
+    if falling:
         for part in rock[0]:
             new_rock.append([part[0], part[1] - 1])
     else:
@@ -80,7 +49,7 @@ def move(fall):
         if collision:
             break
     if collision:
-        if fall:
+        if falling:
             rock[1] = True
             max_height = 0
             for coord in rock[0]:
@@ -89,6 +58,7 @@ def move(fall):
     else:
         rock[0] = new_rock
     rocks.append(rock)
+    return jet_index
 
 
 def hash_state(last_rocks):
@@ -105,65 +75,69 @@ def hash_state(last_rocks):
     for rock in last_rocks:
         for coord in rock[0]:
             grid[max_y-coord[1]][coord[0]] = "1"
-    hash = ""
+    hash_str = ""
     for y in grid:
         for x in y:
-            hash += x
-    return hash
+            hash_str += x
+    return hash_str
 
 
-def step():
-    global height
-    global shapes
-    global shape_index
-    global falling
+def step(rocks, height, shape_index, falling, jet, jet_index):
     if len(rocks) == 0 or rocks[-1][1]:
         if len(rocks) > 0:
             last_rock = rocks[-1]
             for coord in last_rock[0]:
                 height = max(height, coord[1] + 1)
-        rocks.append(create_rock(shapes[shape_index], height))
-        shape_index = (shape_index + 1) % len(shapes)
-        return True
+        rocks.append(create_rock(SHAPES[shape_index], height))
+        shape_index = (shape_index + 1) % len(SHAPES)
+        return True, height, shape_index, falling, jet_index
     else:
-        move(falling)
-        falling = not falling
-        return False
+        jet_index = move(rocks, falling, jet, jet_index)
+        return False, height, shape_index, not falling, jet_index
 
 
-# Part 1
-while len(rocks) < 23:
-    step()
-print(height)
+def solve_p1(jet):
+    falling = False
+    height = 0
+    shape_index = 0
+    jet_index = 0
+    rocks = []
+    while len(rocks) < 2023:
+        finished, height, shape_index, falling, jet_index = step(rocks, height, shape_index, falling, jet, jet_index)
+    return height
 
 
-# Part 2
-shape_index = 0
-jet_index = 0
-rocks = []
-height = 0
-falling = False
-hash_list = dict()
-cycle_start, cycle_end = [], []
+def solve_p2(jet):
+    shape_index = 0
+    jet_index = 0
+    rocks = []
+    height = 0
+    falling = False
+    hash_list = dict()
+    cycle_start, cycle_end = [], []
+
+    while True:
+        finished, height, shape_index, falling, jet_index = step(rocks, height, shape_index, falling, jet, jet_index)
+        if finished:
+            state = hash_state(rocks[-10:])
+            if state in hash_list.keys():
+                cycle_start = hash_list[state]
+                cycle_end = [len(rocks), height]
+                break
+            hash_list[state] = [len(rocks), height]
+    cycles = int((1000000000000 - cycle_start[0]) / (cycle_end[0] - cycle_start[0])) - 1
+    remainder = (1000000000000 - cycle_start[0]) % (cycle_end[0] - cycle_start[0])
+    cycle_height = cycle_end[1] - cycle_start[1]
+    cnt = 0
+    while cnt <= remainder:
+        finished, height, shape_index, falling, jet_index = step(rocks, height, shape_index, falling, jet, jet_index)
+        if finished:
+            cnt += 1
+    total_height = height + cycle_height * cycles
+    return total_height
 
 
-while True:
-    finished = step()
-    if finished:
-        state = hash_state(rocks[-10:])
-        if state in hash_list.keys():
-            cycle_start = hash_list[state]
-            cycle_end = [len(rocks), height]
-            break
-        hash_list[state] = [len(rocks), height]
-cycles = int((1000000000000 - cycle_start[0]) / (cycle_end[0] - cycle_start[0])) - 1
-remainder = (1000000000000 - cycle_start[0]) % (cycle_end[0] - cycle_start[0])
-cycle_height = cycle_end[1] - cycle_start[1]
-cnt = 0
-while cnt <= remainder:
-    finished = step()
-    if finished:
-        cnt += 1
-total_height = height + cycle_height * cycles
-print(total_height)
-
+part1 = utils.time_function(solve_p1, input_str)
+print(part1)
+part2 = utils.time_function(solve_p2, input_str)
+print(part2)
